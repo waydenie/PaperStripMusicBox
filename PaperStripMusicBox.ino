@@ -1,5 +1,7 @@
 #include <synth.h>
 
+#define PwrDetectorPin 10
+
 byte muxValues[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,};
 volatile boolean triggered;
 
@@ -7,17 +9,17 @@ ISR (ANALOG_COMP_vect) {
   triggered = true;
 }
 
-synth psmp;
+synth psmb;
 
 void setup() {
   Serial.begin(9600);
 
-  psmp.begin();
+  psmb.begin();
 
-  psmp.setupVoice(0,SINE,60,ENVELOPE0,80,64);
-  psmp.setupVoice(1,SINE,62,ENVELOPE0,100,64);
-  psmp.setupVoice(2,SINE,64,ENVELOPE2,110,64);
-  psmp.setupVoice(3,SINE,67,ENVELOPE0,110,64);
+  psmb.setupVoice(0,SINE,60,ENVELOPE0,80,64);
+  psmb.setupVoice(1,SINE,62,ENVELOPE0,100,64);
+  psmb.setupVoice(2,SINE,64,ENVELOPE2,110,64);
+  psmb.setupVoice(3,SINE,67,ENVELOPE0,110,64);
 
 //Configure PORTD so that PD2-PD5 are outputs for selecting the external 16 ch multiplexer address and
 //PD6(AIN0) and PD7(AIN1) are pos and neg inputs (resp.) to internal analog comparator
@@ -36,6 +38,9 @@ void setup() {
     (0 << ACIC) |   // Analog Comparator Input Capture: Disabled
     (0 << ACIS1) | (0 << ACIS0);   // Analog Comparator Interrupt Mode: Comparator Interrupt on Toggle
 
+  pinMode(PwrDetectorPin, OUTPUT);
+  digitalWrite(PwrDetectorPin,HIGH); // Start with mux and dividers off
+  
 Serial.println("Begin...");
 }
 
@@ -58,10 +63,13 @@ void displayData()
 void loop() {
 
   for (byte ch=0; ch<16; ch++) {
-    PORTD &= B11000011; // Clear PD2-PD5 mux channel address without disturbing PD0-PD1 (RX/TX) or PD6-PD7 (comparator inputs)
-    PORTD |= (ch << 2); // Set new mux channel address 
-    delay(6); //scan inputs at approx 10 times/s
+    PORTD &= B11000011;   // Clear PD2-PD5 mux channel address without disturbing PD0-PD1 (RX/TX) or PD6-PD7 (comparator inputs)
+    PORTD |= (ch << 2);   // Set new mux channel address 
+    delay(5); //scan inputs at approx 10 times/s
+    digitalWrite(PwrDetectorPin,LOW); // turn on mux and dividers
+    delay(1); //scan inputs at approx 10 times/s
     muxValues[ch]=(ACSR & (1 << ACO));
+//    digitalWrite(PwrDetectorPin,HIGH);// turn off mux and dividers    
   }
   displayData();
 
